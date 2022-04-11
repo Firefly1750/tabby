@@ -23,6 +23,7 @@ export class Application {
     private windows: Window[] = []
     private globalHotkey$ = new Subject<void>()
     private quitRequested = false
+    private configStore: any
     userPluginsPath: string
 
     constructor () {
@@ -32,6 +33,7 @@ export class Application {
 
         ipcMain.on('app:config-change', (_event, config) => {
             this.broadcast('host:config-change', config)
+            this.configStore = config
         })
 
         ipcMain.on('app:register-global-hotkey', (_event, specs) => {
@@ -61,13 +63,17 @@ export class Application {
             }
         })
 
-        const configData = loadConfig()
+        this.configStore = loadConfig()
         if (process.platform === 'linux') {
             app.commandLine.appendSwitch('no-sandbox')
-            if (((configData.appearance || {}).opacity || 1) !== 1) {
+            if (((this.configStore.appearance || {}).opacity || 1) !== 1) {
                 app.commandLine.appendSwitch('enable-transparent-visuals')
                 app.disableHardwareAcceleration()
             }
+        }
+        if (this.configStore.hacks?.disableGPU) {
+            app.commandLine.appendSwitch('disable-gpu')
+            app.disableHardwareAcceleration()
         }
 
         this.userPluginsPath = path.join(
@@ -82,11 +88,14 @@ export class Application {
         app.commandLine.appendSwitch('disable-http-cache')
         app.commandLine.appendSwitch('max-active-webgl-contexts', '9000')
         app.commandLine.appendSwitch('lang', 'EN')
-        app.allowRendererProcessReuse = false
 
-        for (const flag of configData.flags || [['force_discrete_gpu', '0']]) {
+        for (const flag of this.configStore.flags || [['force_discrete_gpu', '0']]) {
             app.commandLine.appendSwitch(flag[0], flag[1])
         }
+
+        app.on('before-quit', () => {
+            this.quitRequested = true
+        })
 
         app.on('window-all-closed', () => {
             if (this.quitRequested || process.platform !== 'darwin') {
@@ -104,6 +113,9 @@ export class Application {
     async newWindow (options?: WindowOptions): Promise<Window> {
         const window = new Window(this, options)
         this.windows.push(window)
+        if (this.windows.length === 1){
+            window.makeMain()
+        }
         window.visible$.subscribe(visible => {
             if (visible) {
                 this.disableTray()
@@ -113,6 +125,10 @@ export class Application {
         })
         window.closed$.subscribe(() => {
             this.windows = this.windows.filter(x => x !== window)
+            if (!this.windows.some(x => x.isMainWindow)) {
+                this.windows[0]?.makeMain()
+                this.windows[0]?.present()
+            }
         })
         if (process.platform === 'darwin') {
             this.setupMenu()
@@ -122,7 +138,14 @@ export class Application {
     }
 
     onGlobalHotkey (): void {
-        if (this.windows.some(x => x.isFocused() && x.isVisible())) {
+        let isPresent = this.windows.some(x => x.isFocused() && x.isVisible())
+        const isDockedOnTop = this.windows.some(x => x.isDockedOnTop())
+        if (isDockedOnTop) {
+            // if docked and on top, hide even if not focused right now
+            isPresent = this.windows.some(x => x.isVisible())
+        }
+
+        if (isPresent) {
             for (const window of this.windows) {
                 window.hide()
             }
@@ -191,7 +214,7 @@ export class Application {
 
     focus (): void {
         for (const window of this.windows) {
-            window.show()
+            window.present()
         }
     }
 

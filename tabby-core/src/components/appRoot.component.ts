@@ -14,6 +14,7 @@ import { UpdaterService } from '../services/updater.service'
 import { BaseTabComponent } from './baseTab.component'
 import { SafeModeModalComponent } from './safeModeModal.component'
 import { TabBodyComponent } from './tabBody.component'
+import { SplitTabComponent } from './splitTab.component'
 import { AppService, FileTransfer, HostWindowService, PlatformService, ToolbarButton, ToolbarButtonProvider } from '../api'
 
 /** @hidden */
@@ -108,12 +109,18 @@ export class AppRootComponent {
                 if (hotkey === 'move-tab-right') {
                     this.app.moveSelectedTabRight()
                 }
-                if (hotkey === 'reopen-tab') {
-                    this.app.reopenLastTab()
-                }
                 if (hotkey === 'duplicate-tab') {
                     this.app.duplicateTab(this.app.activeTab)
                 }
+                if (hotkey === 'explode-tab' && this.app.activeTab instanceof SplitTabComponent) {
+                    this.app.explodeTab(this.app.activeTab)
+                }
+                if (hotkey === 'combine-tabs' && this.app.activeTab instanceof SplitTabComponent) {
+                    this.app.combineTabsInto(this.app.activeTab)
+                }
+            }
+            if (hotkey === 'reopen-tab') {
+                this.app.reopenLastTab()
             }
             if (hotkey === 'toggle-fullscreen') {
                 hostWindow.toggleFullscreen()
@@ -196,6 +203,13 @@ export class AppRootComponent {
     }
 
     onTabsReordered (event: CdkDragDrop<BaseTabComponent[]>) {
+        const tab: BaseTabComponent = event.item.data
+        if (!this.app.tabs.includes(tab)) {
+            if (tab.parent instanceof SplitTabComponent) {
+                tab.parent.removeTab(tab)
+                this.app.wrapAndAddTab(tab)
+            }
+        }
         moveItemInArray(this.app.tabs, event.previousIndex, event.currentIndex)
         this.app.emitTabsChanged()
     }
@@ -204,6 +218,10 @@ export class AppRootComponent {
         if (this.activeTransfers.length === 0) {
             this.activeTransfersDropdown.close()
         }
+    }
+
+    @HostBinding('class.vibrant') get isVibrant () {
+        return this.config.store?.appearance.vibrancy
     }
 
     private getToolbarButtons (aboveZero: boolean): ToolbarButton[] {

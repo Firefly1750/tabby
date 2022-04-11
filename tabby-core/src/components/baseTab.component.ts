@@ -1,4 +1,4 @@
-import { Observable, Subject, distinctUntilChanged } from 'rxjs'
+import { Observable, Subject, distinctUntilChanged, filter, debounceTime } from 'rxjs'
 import { EmbeddedViewRef, ViewContainerRef, ViewRef } from '@angular/core'
 import { RecoveryToken } from '../api/tabRecovery'
 import { BaseComponent } from './base.component'
@@ -9,6 +9,10 @@ import { BaseComponent } from './base.component'
  */
 export interface BaseTabProcess {
     name: string
+}
+
+export interface GetRecoveryTokenOptions {
+    includeState: boolean
 }
 
 /**
@@ -43,7 +47,16 @@ export abstract class BaseTabComponent extends BaseComponent {
     /**
      * CSS color override for the tab's header
      */
-    color: string|null = null
+    get color (): string|null { return this._color }
+    set color (value: string|null) { this._color = value }
+    private _color: string|null = null
+
+    /**
+     * icon override for the tab's header
+     */
+    get icon (): string|null { return this._icon }
+    set icon (value: string|null) { this._icon = value }
+    private _icon: string|null = null
 
     hasFocus = false
 
@@ -57,7 +70,6 @@ export abstract class BaseTabComponent extends BaseComponent {
     /* @hidden */
     viewContainerEmbeddedRef?: EmbeddedViewRef<any>
 
-    private progressClearTimeout: number
     private titleChange = new Subject<string>()
     private focused = new Subject<void>()
     private blurred = new Subject<void>()
@@ -83,6 +95,12 @@ export abstract class BaseTabComponent extends BaseComponent {
         this.blurred$.subscribe(() => {
             this.hasFocus = false
         })
+        this.subscribeUntilDestroyed(this.progress.pipe(
+            filter(x => x !== null),
+            debounceTime(5000),
+        ), () => {
+            this.setProgress(null)
+        })
     }
 
     setTitle (title: string): void {
@@ -99,14 +117,6 @@ export abstract class BaseTabComponent extends BaseComponent {
      */
     setProgress (progress: number|null): void {
         this.progress.next(progress)
-        if (progress) {
-            if (this.progressClearTimeout) {
-                clearTimeout(this.progressClearTimeout)
-            }
-            this.progressClearTimeout = setTimeout(() => {
-                this.setProgress(null)
-            }, 5000) as any
-        }
     }
 
     /**
@@ -136,7 +146,7 @@ export abstract class BaseTabComponent extends BaseComponent {
      * @return JSON serializable tab state representation
      *         for your [[TabRecoveryProvider]] to parse
      */
-    async getRecoveryToken (): Promise<RecoveryToken|null> {
+    async getRecoveryToken (options?: GetRecoveryTokenOptions): Promise<RecoveryToken|null> { // eslint-disable-line @typescript-eslint/no-unused-vars
         return null
     }
 

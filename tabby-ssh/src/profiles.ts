@@ -1,10 +1,11 @@
-import { Injectable } from '@angular/core'
-import { ProfileProvider, NewTabParameters, PartialProfile } from 'tabby-core'
+import { Inject, Injectable, Optional } from '@angular/core'
+import { ProfileProvider, NewTabParameters, PartialProfile, TranslateService } from 'tabby-core'
 import * as ALGORITHMS from 'ssh2/lib/protocol/constants'
 import { SSHProfileSettingsComponent } from './components/sshProfileSettings.component'
 import { SSHTabComponent } from './components/sshTab.component'
 import { PasswordStorageService } from './services/passwordStorage.service'
 import { ALGORITHM_BLACKLIST, SSHAlgorithmType, SSHProfile } from './api'
+import { SSHProfileImporter } from './api/importer'
 
 @Injectable({ providedIn: 'root' })
 export class SSHProfilesService extends ProfileProvider<SSHProfile> {
@@ -39,11 +40,16 @@ export class SSHProfilesService extends ProfileProvider<SSHProfile> {
             scripts: [],
             socksProxyHost: null,
             socksProxyPort: null,
+            httpProxyHost: null,
+            httpProxyPort: null,
+            reuseSession: true,
         },
     }
 
     constructor (
-        private passwordStorage: PasswordStorageService
+        private passwordStorage: PasswordStorageService,
+        private translate: TranslateService,
+        @Inject(SSHProfileImporter) @Optional() private importers: SSHProfileImporter[]|null,
     ) {
         super()
         for (const k of Object.values(SSHAlgorithmType)) {
@@ -59,20 +65,34 @@ export class SSHProfilesService extends ProfileProvider<SSHProfile> {
     }
 
     async getBuiltinProfiles (): Promise<PartialProfile<SSHProfile>[]> {
-        return [{
-            id: `ssh:template`,
-            type: 'ssh',
-            name: 'SSH connection',
-            icon: 'fas fa-desktop',
-            options: {
-                host: '',
-                port: 22,
-                user: 'root',
+        let imported: PartialProfile<SSHProfile>[] = []
+        for (const importer of this.importers ?? []) {
+            try {
+                imported = imported.concat(await importer.getProfiles())
+            } catch (e) {
+                console.warn('Could not parse OpenSSH config:', e)
+            }
+        }
+        return [
+            {
+                id: `ssh:template`,
+                type: 'ssh',
+                name: this.translate.instant('SSH connection'),
+                icon: 'fas fa-desktop',
+                options: {
+                    host: '',
+                    port: 22,
+                    user: 'root',
+                },
+                isBuiltin: true,
+                isTemplate: true,
+                weight: -1,
             },
-            isBuiltin: true,
-            isTemplate: true,
-            weight: -1,
-        }]
+            ...imported.map(p => ({
+                ...p,
+                isBuiltin: true,
+            })),
+        ]
     }
 
     async getNewTabParameters (profile: SSHProfile): Promise<NewTabParameters<SSHTabComponent>> {

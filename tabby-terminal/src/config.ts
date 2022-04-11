@@ -5,6 +5,7 @@ export class TerminalConfigProvider extends ConfigProvider {
     defaults = {
         hotkeys: {
             'copy-current-path': [],
+            'scroll-to-bottom': [],
         },
         terminal: {
             frontend: 'xterm',
@@ -18,10 +19,12 @@ export class TerminalConfigProvider extends ConfigProvider {
             cursor: 'block',
             cursorBlink: true,
             hideTabIndex: false,
+            showTabProfileIcon: false,
             hideCloseButton: false,
             rightClick: 'menu',
             pasteOnMiddleClick: true,
             copyOnSelect: false,
+            copyAsHTML: true,
             scrollOnInput: true,
             altIsMeta: false,
             wordSeparator: ' ()[]{}\'"',
@@ -153,6 +156,7 @@ export class TerminalConfigProvider extends ConfigProvider {
         [Platform.Linux]: {
             terminal: {
                 font: 'Liberation Mono',
+                pasteOnMiddleClick: false, // handled by OS
             },
             hotkeys: {
                 'ctrl-c': ['Ctrl-C'],

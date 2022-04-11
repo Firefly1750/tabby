@@ -25,15 +25,13 @@ window-controls {
 
 $border-color: #111;
 
-body {
+app-root  {
     background: $body-bg;
 
     &.vibrant {
         background: rgba(0,0,0,.65);
     }
-}
 
-app-root  {
     &.no-tabs {
         background: rgba(0,0,0,.5);
     }
@@ -62,6 +60,10 @@ app-root  {
 
                     .index {
                         color: rgba(255, 255, 255, 0.4);
+                    }
+
+                    .icon {
+                        opacity: .75;
                     }
 
                     button {
@@ -124,8 +126,13 @@ app-root  {
 
     &.platform-win32, &.platform-linux {
         border: 1px solid #111;
-        &>.content .tab-bar .tabs tab-header:first-child {
-            border-left: none;
+
+        &>.content {
+            margin: -1px; // expand the content into the border
+
+            .tab-bar .tabs tab-header:first-child {
+                border-left: none;
+            }
         }
     }
 }
@@ -133,7 +140,7 @@ app-root  {
 tab-body {
     background: $content-bg;
 
-    .terminal-toolbar .btn, .toolbar-pin-button {
+    terminal-toolbar .btn, .toolbar-pin-button {
         font-weight: bold;
     }
 }
@@ -223,7 +230,7 @@ hotkey-input-modal {
 }
 
 .list-group-item {
-    transition: 0.0625s background;
+    // transition: 0.0625s background ease;
 
     i + * {
         margin-left: 10px;
@@ -232,7 +239,7 @@ hotkey-input-modal {
 
 .list-group.list-group-flush .list-group-item {
     background: transparent;
-    border-color: rgba(0, 0, 0, 0.2);
+    border: none;
 
     &:not(:last-child) {
         border-bottom: none;
@@ -247,11 +254,16 @@ hotkey-input-modal {
 
 .list-group-light {
     .list-group-item {
-        border: none;
+        border: none !important;
+        outline: none !important;
+        background: transparent;
+        border-radius: $border-radius;
+        margin: 0 !important;
 
         &.list-group-item-action {
             &:hover, &.active {
-                background: $list-group-hover-bg;
+                background: $component-active-bg;
+                color: $component-active-color;
             }
         }
     }
@@ -380,4 +392,16 @@ hr {
 
 .dropdown-menu {
     box-shadow: $dropdown-box-shadow;
+}
+
+ngx-colors-panel .opened {
+    background: $body-bg !important;
+
+    button {
+        color: $body-color;
+    }
+
+    .button svg {
+        fill: white;
+    }
 }

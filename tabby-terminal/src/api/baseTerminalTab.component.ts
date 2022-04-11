@@ -1,17 +1,17 @@
-import { Observable, Subject, Subscription, first } from 'rxjs'
+import { Observable, Subject, Subscription, first, auditTime } from 'rxjs'
 import { Spinner } from 'cli-spinner'
 import colors from 'ansi-colors'
 import { NgZone, OnInit, OnDestroy, Injector, ViewChild, HostBinding, Input, ElementRef, InjectFlags } from '@angular/core'
 import { trigger, transition, style, animate, AnimationTriggerMetadata } from '@angular/animations'
-import { AppService, ConfigService, BaseTabComponent, HostAppService, HotkeysService, NotificationsService, Platform, LogService, Logger, TabContextMenuItemProvider, SplitTabComponent, SubscriptionContainer, MenuItemOptions, PlatformService, HostWindowService, ResettableTimeout } from 'tabby-core'
+import { AppService, ConfigService, BaseTabComponent, HostAppService, HotkeysService, NotificationsService, Platform, LogService, Logger, TabContextMenuItemProvider, SplitTabComponent, SubscriptionContainer, MenuItemOptions, PlatformService, HostWindowService, ResettableTimeout, TranslateService } from 'tabby-core'
 
 import { BaseSession } from '../session'
-import { TerminalFrontendService } from '../services/terminalFrontend.service'
 
 import { Frontend } from '../frontends/frontend'
+import { XTermFrontend, XTermWebGLFrontend } from '../frontends/xtermFrontend'
 import { ResizeEvent } from './interfaces'
 import { TerminalDecorator } from './decorator'
-
+import { SearchPanelComponent } from '../components/searchPanel.component'
 
 /**
  * A class to base your custom terminal tabs on
@@ -73,9 +73,6 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
     @HostBinding('style.background-color') backgroundColor: string|null = null
 
     /** @hidden */
-    @HostBinding('class.top-padded') topPadded: boolean
-
-    /** @hidden */
     @HostBinding('class.toolbar-enabled') enableToolbar = false
 
     /** @hidden */
@@ -104,6 +101,8 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
 
     alternateScreenActive = false
 
+    @ViewChild(SearchPanelComponent, { 'static': false }) searchPanel?: SearchPanelComponent
+
     // Deps start
     config: ConfigService
     element: ElementRef
@@ -112,12 +111,12 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
     protected hostApp: HostAppService
     protected hotkeys: HotkeysService
     protected platform: PlatformService
-    protected terminalContainersService: TerminalFrontendService
     protected notifications: NotificationsService
     protected log: LogService
     protected decorators: TerminalDecorator[] = []
     protected contextMenuProviders: TabContextMenuItemProvider[]
     protected hostWindow: HostWindowService
+    protected translate: TranslateService
     // Deps end
 
     protected logger: Logger
@@ -180,15 +179,15 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         this.hostApp = injector.get(HostAppService)
         this.hotkeys = injector.get(HotkeysService)
         this.platform = injector.get(PlatformService)
-        this.terminalContainersService = injector.get(TerminalFrontendService)
         this.notifications = injector.get(NotificationsService)
         this.log = injector.get(LogService)
         this.decorators = injector.get<any>(TerminalDecorator, null, InjectFlags.Optional) as TerminalDecorator[]
         this.contextMenuProviders = injector.get<any>(TabContextMenuItemProvider, null, InjectFlags.Optional) as TabContextMenuItemProvider[]
         this.hostWindow = injector.get(HostWindowService)
+        this.translate = injector.get(TranslateService)
 
         this.logger = this.log.create('baseTerminalTab')
-        this.setTitle('Terminal')
+        this.setTitle(this.translate.instant('Terminal'))
 
         this.subscribeUntilDestroyed(this.hotkeys.hotkey$, async hotkey => {
             if (!this.hasFocus) {
@@ -199,7 +198,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
                     if (this.frontend?.getSelection()) {
                         this.frontend.copySelection()
                         this.frontend.clearSelection()
-                        this.notifications.notice('Copied')
+                        this.notifications.notice(this.translate.instant('Copied'))
                     } else {
                         this.forEachFocusedTerminalPane(tab => tab.sendInput('\x03'))
                     }
@@ -207,7 +206,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
                 case 'copy':
                     this.frontend?.copySelection()
                     this.frontend?.clearSelection()
-                    this.notifications.notice('Copied')
+                    this.notifications.notice(this.translate.instant('Copied'))
                     break
                 case 'paste':
                     this.forEachFocusedTerminalPane(tab => tab.paste())
@@ -262,7 +261,9 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
                 case 'search':
                     this.showSearchPanel = true
                     setImmediate(() => {
-                        this.element.nativeElement.querySelector('.search-input').focus()
+                        const input = this.element.nativeElement.querySelector('.search-input')
+                        input?.focus()
+                        input?.select()
                     })
                     break
                 case 'pane-focus-all':
@@ -270,6 +271,9 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
                     break
                 case 'copy-current-path':
                     this.copyCurrentPath()
+                    break
+                case 'scroll-to-bottom':
+                    this.frontend?.scrollToBottom()
                     break
             }
         })
@@ -289,7 +293,11 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
             this.frontend?.focus()
         })
 
-        this.frontend = this.terminalContainersService.getFrontend(this.session)
+        const cls: new (..._) => Frontend = {
+            xterm: XTermFrontend,
+            'xterm-webgl': XTermWebGLFrontend,
+        }[this.config.store.terminal.frontend] ?? XTermFrontend
+        this.frontend = new cls(this.injector)
 
         this.frontendReady$.pipe(first()).subscribe(() => {
             this.onFrontendReady()
@@ -313,6 +321,9 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
             }, 1000)
 
             this.session?.releaseInitialDataBuffer()
+            this.sessionChanged$.subscribe(() => {
+                this.session?.releaseInitialDataBuffer()
+            })
         })
 
         this.alternateScreenActive$.subscribe(x => {
@@ -386,7 +397,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         if (!(data instanceof Buffer)) {
             data = Buffer.from(data, 'utf-8')
         }
-        this.session?.write(data)
+        this.session?.feedFromTerminal(data)
         if (this.config.store.terminal.scrollOnInput) {
             this.frontend?.scrollToBottom()
         }
@@ -437,12 +448,15 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
             data = data.trim()
 
             if (data.includes('\r') && this.config.store.terminal.warnOnMultilinePaste) {
-                const buttons = ['Paste', 'Cancel']
+                const buttons = [
+                    this.translate.instant('Paste'),
+                    this.translate.instant('Cancel'),
+                ]
                 const result = (await this.platform.showMessageBox(
                     {
                         type: 'warning',
                         detail: data,
-                        message: `Paste multiple lines?`,
+                        message: this.translate.instant('Paste multiple lines?'),
                         buttons,
                         defaultId: 0,
                         cancelId: 1,
@@ -465,10 +479,6 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
      */
     configure (): void {
         this.frontend?.configure()
-
-        this.topPadded = this.hostApp.platform === Platform.macOS
-            && this.config.store.appearance.frame === 'thin'
-            && this.config.store.appearance.tabsLocation !== 'top'
 
         if (this.config.store.terminal.background === 'colorScheme') {
             if (this.config.store.terminal.colorScheme.background) {
@@ -531,9 +541,9 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         }
         if (cwd) {
             this.platform.setClipboard({ text: cwd })
-            this.notifications.notice('Copied')
+            this.notifications.notice(this.translate.instant('Copied'))
         } else {
-            this.notifications.error('Shell does not support current path detection')
+            this.notifications.error(this.translate.instant('Shell does not support current path detection'))
         }
     }
 
@@ -544,6 +554,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
 
     async destroy (): Promise<void> {
         this.frontend?.detach(this.content.nativeElement)
+        this.frontend?.destroy()
         this.frontend = undefined
         this.content.nativeElement.remove()
         this.detachTermContainerHandlers()
@@ -641,9 +652,9 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
                 let wheelDeltaY = 0
 
                 if ('wheelDeltaY' in event) {
-                    wheelDeltaY = (event as MouseWheelEvent)['wheelDeltaY']
+                    wheelDeltaY = (event as WheelEvent)['wheelDeltaY']
                 } else {
-                    wheelDeltaY = (event as MouseWheelEvent)['deltaY']
+                    wheelDeltaY = (event as WheelEvent).deltaY
                 }
 
                 if (event.altKey) {
@@ -658,7 +669,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
             this.sendInput(data)
         })
 
-        this.termContainerSubscriptions.subscribe(this.frontend.resize$, ({ columns, rows }) => {
+        this.termContainerSubscriptions.subscribe(this.frontend.resize$.pipe(auditTime(100)), ({ columns, rows }) => {
             this.logger.debug(`Resizing to ${columns}x${rows}`)
             this.size = { columns, rows }
             this.zone.run(() => {
@@ -701,6 +712,10 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
         window.localStorage.pinTerminalToolbar = this.pinToolbar
     }
 
+    @HostBinding('class.with-title-inset') get hasTitleInset (): boolean {
+        return this.hostApp.platform === Platform.macOS && this.config.store.appearance.tabsLocation !== 'top' && this.config.store.appearance.frame === 'thin'
+    }
+
     protected attachSessionHandler <T> (observable: Observable<T>, handler: (v: T) => void): void {
         this.sessionHandlers.subscribe(observable, handler)
     }
@@ -720,7 +735,6 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
 
         if (destroyOnSessionClose) {
             this.attachSessionHandler(this.session.closed$, () => {
-                this.frontend?.destroy()
                 this.destroy()
             })
         }
@@ -731,7 +745,7 @@ export class BaseTerminalTabComponent extends BaseTabComponent implements OnInit
 
         this.attachSessionHandler(this.session.oscProcessor.copyRequested$, content => {
             this.platform.setClipboard({ text: content })
-            this.notifications.notice('Copied')
+            this.notifications.notice(this.translate.instant('Copied'))
         })
     }
 

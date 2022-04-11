@@ -9,6 +9,11 @@ export interface SearchOptions {
     incremental?: true
 }
 
+export interface SearchState {
+    resultIndex?: number
+    resultCount: number
+}
+
 /**
  * Extend to add support for a different VT frontend implementation
  */
@@ -75,11 +80,13 @@ export abstract class Frontend {
     abstract configure (): void
     abstract setZoom (zoom: number): void
 
-    abstract findNext (term: string, searchOptions?: SearchOptions): boolean
-    abstract findPrevious (term: string, searchOptions?: SearchOptions): boolean
+    abstract findNext (term: string, searchOptions?: SearchOptions): SearchState
+    abstract findPrevious (term: string, searchOptions?: SearchOptions): SearchState
+    abstract cancelSearch (): void
 
     abstract saveState (): any
     abstract restoreState (state: string): void
 
     abstract supportsBracketedPaste (): boolean
+    abstract isAlternateScreenActive (): boolean
 }

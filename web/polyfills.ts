@@ -68,6 +68,7 @@ Tabby.registerMock('tty', { isatty: () => false })
 Tabby.registerMock('child_process', {})
 Tabby.registerMock('readable-stream', {})
 Tabby.registerMock('os', {
+    arch: () => 'web',
     platform: () => 'web',
     homedir: () => '/home',
 })
@@ -90,6 +91,7 @@ Tabby.registerMock('keytar', {
     getPassword: () => null,
 })
 Tabby.registerMock('@serialport/bindings', {})
+Tabby.registerMock('@serialport/bindings-cpp', {})
 
 Tabby.registerModule('net', {
     Socket: SocketProxy,
@@ -135,6 +137,7 @@ Tabby.registerModule('ngx-toastr', require('ngx-toastr'))
 Tabby.registerModule('deepmerge', require('deepmerge'))
 Tabby.registerModule('rxjs', require('rxjs'))
 Tabby.registerModule('rxjs/operators', require('rxjs'))
+Tabby.registerModule('string_decoder', require('string_decoder'))
 Tabby.registerModule('js-yaml', require('js-yaml'))
 Tabby.registerModule('zone.js/dist/zone.js', require('zone.js/dist/zone.js'))
 

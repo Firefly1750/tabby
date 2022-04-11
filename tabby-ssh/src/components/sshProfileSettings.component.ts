@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import { Component, ViewChild } from '@angular/core'
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
+import { firstBy } from 'thenby'
 
 import { ConfigService, FileProvidersService, Platform, HostAppService, PromptModalComponent, PartialProfile } from 'tabby-core'
 import { LoginScriptsSettingsComponent } from 'tabby-terminal'
@@ -17,7 +18,7 @@ export class SSHProfileSettingsComponent {
     profile: SSHProfile
     hasSavedPassword: boolean
 
-    connectionMode: 'direct'|'proxyCommand'|'jumpHost'|'socksProxy' = 'direct'
+    connectionMode: 'direct'|'proxyCommand'|'jumpHost'|'socksProxy'|'httpProxy' = 'direct'
 
     supportedAlgorithms = supportedAlgorithms
     algorithms: Record<string, Record<string, boolean>> = {}
@@ -34,6 +35,8 @@ export class SSHProfileSettingsComponent {
 
     async ngOnInit () {
         this.jumpHosts = this.config.store.profiles.filter(x => x.type === 'ssh' && x !== this.profile)
+        this.jumpHosts.sort(firstBy(x => this.getJumpHostLabel(x)))
+
         for (const k of Object.values(SSHAlgorithmType)) {
             this.algorithms[k] = {}
             for (const alg of this.profile.options.algorithms?.[k] ?? []) {
@@ -50,6 +53,8 @@ export class SSHProfileSettingsComponent {
             this.connectionMode = 'jumpHost'
         } else if (this.profile.options.socksProxyHost) {
             this.connectionMode = 'socksProxy'
+        } else if (this.profile.options.httpProxyHost) {
+            this.connectionMode = 'httpProxy'
         }
 
         if (this.profile.options.user) {
@@ -59,6 +64,10 @@ export class SSHProfileSettingsComponent {
                 console.error('Could not check for saved password', e)
             }
         }
+    }
+
+    getJumpHostLabel (p: PartialProfile<SSHProfile>) {
+        return p.group ? `${p.group} / ${p.name}` : p.name
     }
 
     async setPassword () {
@@ -109,6 +118,10 @@ export class SSHProfileSettingsComponent {
             this.profile.options.socksProxyHost = undefined
             this.profile.options.socksProxyPort = undefined
         }
+        if (this.connectionMode !== 'httpProxy') {
+            this.profile.options.httpProxyHost = undefined
+            this.profile.options.httpProxyPort = undefined
+        }
 
         this.loginScriptsSettings?.save()
     }
@@ -128,6 +141,7 @@ export class SSHProfileSettingsComponent {
             proxyCommand: 'Proxy command',
             jumpHost: 'Jump host',
             socksProxy: 'SOCKS proxy',
+            httpProxy: 'HTTP proxy',
         }[this.connectionMode]
     }
 }

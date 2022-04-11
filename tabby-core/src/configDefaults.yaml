@@ -12,7 +12,7 @@ appearance:
   frame: thin
   css: '/* * { color: blue !important; } */'
   opacity: 1.0
-  vibrancy: true
+  vibrancy: false
   vibrancyType: 'blur'
 terminal:
   showBuiltinProfiles: true
@@ -35,3 +35,8 @@ version: 1
 vault: null
 encrypted: false
 enableExperimentalFeatures: false
+pluginBlacklist: []
+hacks:
+  disableGPU: false
+  disableVibrancyWhileDragging: false
+language: null

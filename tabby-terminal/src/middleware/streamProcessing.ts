@@ -2,9 +2,10 @@ import hexdump from 'hexer'
 import bufferReplace from 'buffer-replace'
 import colors from 'ansi-colors'
 import binstring from 'binstring'
-import { Subject, Observable, interval, debounce } from 'rxjs'
+import { interval, debounce } from 'rxjs'
 import { PassThrough, Readable, Writable } from 'stream'
 import { ReadLine, createInterface as createReadline, clearLine } from 'readline'
+import { SessionMiddleware } from '../api/middleware'
 
 export type InputMode = null | 'local-echo' | 'readline' | 'readline-hex'
 export type OutputMode = null | 'hex'
@@ -17,20 +18,16 @@ export interface StreamProcessingOptions {
     outputNewlines?: NewlineMode
 }
 
-export class TerminalStreamProcessor {
-    get outputToSession$ (): Observable<Buffer> { return this.outputToSession }
-    get outputToTerminal$ (): Observable<Buffer> { return this.outputToTerminal }
-
-    protected outputToSession = new Subject<Buffer>()
-    protected outputToTerminal = new Subject<Buffer>()
-
-    private inputReadline: ReadLine
+export class TerminalStreamProcessor extends SessionMiddleware {
+    forceEcho = false
+    private inputReadline: ReadLine|null = null
     private inputPromptVisible = false
     private inputReadlineInStream: Readable & Writable
     private inputReadlineOutStream: Readable & Writable
     private started = false
 
     constructor (private options: StreamProcessingOptions) {
+        super()
         this.inputReadlineInStream = new PassThrough()
         this.inputReadlineOutStream = new PassThrough()
         this.inputReadlineOutStream.on('data', data => {
@@ -85,7 +82,7 @@ export class TerminalStreamProcessor {
     }
 
     feedFromTerminal (data: Buffer): void {
-        if (this.options.inputMode === 'local-echo') {
+        if (this.options.inputMode === 'local-echo' || this.forceEcho) {
             this.outputToTerminal.next(this.replaceNewlines(data, 'crlf'))
         }
         if (this.options.inputMode?.startsWith('readline')) {
@@ -102,9 +99,8 @@ export class TerminalStreamProcessor {
     }
 
     close (): void {
-        this.inputReadline.close()
-        this.outputToSession.complete()
-        this.outputToTerminal.complete()
+        this.inputReadline?.close()
+        super.close()
     }
 
     private onTerminalInput (data: Buffer) {
@@ -130,7 +126,7 @@ export class TerminalStreamProcessor {
 
     private resetInputPrompt () {
         this.outputToTerminal.next(Buffer.from('\r\n'))
-        this.inputReadline.prompt(true)
+        this.inputReadline?.prompt(true)
         this.inputPromptVisible = true
     }
 

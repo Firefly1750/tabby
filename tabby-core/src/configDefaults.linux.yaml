@@ -4,7 +4,7 @@ hotkeys:
   close-tab:
     - 'Ctrl-Shift-W'
   reopen-tab:
-    - 'Ctrl-Shift-T'
+    - 'Ctrl-Shift-Z'
   toggle-last-tab: []
   rename-tab:
     - 'Ctrl-Shift-R'
@@ -21,6 +21,10 @@ hotkeys:
   rearrange-panes:
     - 'Ctrl-Shift'
   duplicate-tab: []
+  explode-tab:
+    - 'Ctrl-Shift-.'
+  combine-tabs:
+    - 'Ctrl-Shift-,'
   tab-1:
     - 'Alt-1'
   tab-2:
@@ -52,7 +56,7 @@ hotkeys:
   tab-19: []
   tab-20: []
   split-right:
-    - 'Ctrl-Shift-E'
+    - 'Ctrl-Shift-S'
   split-bottom:
     - 'Ctrl-Shift-D'
   split-left: []
@@ -75,5 +79,4 @@ hotkeys:
   switch-profile:
     - 'Ctrl-Alt-T'
   profile-selector:
-    - 'Ctrl-Shift-T'
-pluginBlacklist: ['ssh']
+    - 'Ctrl-Shift-E'

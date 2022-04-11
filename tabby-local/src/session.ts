@@ -140,6 +140,7 @@ export class Session extends BaseSession {
             let env = mergeEnv(
                 process.env,
                 {
+                    COLORTERM: 'truecolor',
                     TERM: 'xterm-256color',
                     TERM_PROGRAM: 'Tabby',
                 },
@@ -295,18 +296,16 @@ export class Session extends BaseSession {
         } else {
             await new Promise<void>((resolve) => {
                 this.kill('SIGTERM')
-                setImmediate(() => {
+                setTimeout(() => {
                     try {
                         process.kill(this.pty!.getPID(), 0)
                         // still alive
-                        setTimeout(() => {
-                            this.kill('SIGKILL')
-                            resolve()
-                        }, 1000)
+                        this.kill('SIGKILL')
+                        resolve()
                     } catch {
                         resolve()
                     }
-                })
+                }, 500)
             })
         }
     }

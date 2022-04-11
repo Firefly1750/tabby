@@ -32,6 +32,9 @@ export interface SSHProfileOptions extends LoginScriptsOptions {
     forwardedPorts?: ForwardedPortConfig[]
     socksProxyHost?: string
     socksProxyPort?: number
+    httpProxyHost?: string
+    httpProxyPort?: number
+    reuseSession?: boolean
 }
 
 export enum PortForwardType {
@@ -49,8 +52,12 @@ export interface ForwardedPortConfig {
     description: string
 }
 
-export const ALGORITHM_BLACKLIST = [
+export let ALGORITHM_BLACKLIST = [
     // cause native crashes in node crypto, use EC instead
     'diffie-hellman-group-exchange-sha256',
     'diffie-hellman-group-exchange-sha1',
 ]
+
+if (!process.env.TABBY_ENABLE_SSH_ALG_BLACKLIST) {
+    ALGORITHM_BLACKLIST = []
+}

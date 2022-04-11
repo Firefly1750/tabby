@@ -5,6 +5,12 @@
 .index(*ngIf='!config.store.terminal.hideTabIndex && hostApp.platform === Platform.macOS', cdkDragHandle) {{index + 1}}
 .index(*ngIf='!config.store.terminal.hideTabIndex && hostApp.platform !== Platform.macOS') {{index + 1}}
 
+profile-icon(
+    *ngIf='config.store.terminal.showTabProfileIcon && tab.icon',
+    [icon]='tab.icon',
+    [color]='tab.color'
+)
+
 .name(
     [title]='tab.customTitle || tab.title',
     [class.no-hover]='config.store.terminal.hideCloseButton'

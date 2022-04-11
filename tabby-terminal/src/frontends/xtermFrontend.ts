@@ -1,11 +1,11 @@
 import { Injector } from '@angular/core'
 import { ConfigService, getCSSFontFamily, HostAppService, HotkeysService, Platform, PlatformService } from 'tabby-core'
-import { Frontend, SearchOptions } from './frontend'
+import { Frontend, SearchOptions, SearchState } from './frontend'
 import { takeUntil } from 'rxjs'
 import { Terminal, ITheme } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import { LigaturesAddon } from 'xterm-addon-ligatures'
-import { SearchAddon } from 'xterm-addon-search'
+import { ISearchOptions, SearchAddon } from 'xterm-addon-search'
 import { WebglAddon } from 'xterm-addon-webgl'
 import { Unicode11Addon } from 'xterm-addon-unicode11'
 import { SerializeAddon } from 'xterm-addon-serialize'
@@ -34,6 +34,7 @@ export class XTermFrontend extends Frontend {
     private configuredTheme: ITheme = {}
     private copyOnSelect = false
     private search = new SearchAddon()
+    private searchState: SearchState = { resultCount: 0 }
     private fitAddon = new FitAddon()
     private serializeAddon = new SerializeAddon()
     private ligaturesAddon?: LigaturesAddon
@@ -55,6 +56,7 @@ export class XTermFrontend extends Frontend {
 
         this.xterm = new Terminal({
             allowTransparency: true,
+            overviewRulerWidth: 8,
             windowsMode: process.platform === 'win32',
         })
         this.xtermCore = this.xterm['_core']
@@ -86,6 +88,16 @@ export class XTermFrontend extends Frontend {
         this.xterm.unicode.activeVersion = '11'
 
         const keyboardEventHandler = (name: string, event: KeyboardEvent) => {
+            if (this.isAlternateScreenActive()) {
+                let modifiers = 0
+                modifiers += event.ctrlKey ? 1 : 0
+                modifiers += event.altKey ? 1 : 0
+                modifiers += event.shiftKey ? 1 : 0
+                modifiers += event.metaKey ? 1 : 0
+                if (event.key.startsWith('Arrow') && modifiers === 1) {
+                    return true
+                }
+            }
             this.hotkeysService.pushKeyEvent(name, event)
             let ret = true
             if (this.hotkeysService.matchActiveHotkey(true) !== null) {
@@ -128,9 +140,12 @@ export class XTermFrontend extends Frontend {
             }
         }
 
+        const oldKeyUp = this.xtermCore._keyUp.bind(this.xtermCore)
         this.xtermCore._keyUp = (e: KeyboardEvent) => {
             this.xtermCore.updateCursorStyle(e)
-            keyboardEventHandler('keyup', e)
+            if (keyboardEventHandler('keyup', e)) {
+                oldKeyUp(e)
+            }
         }
 
         this.xterm.buffer.onBufferChange(() => {
@@ -164,6 +179,10 @@ export class XTermFrontend extends Frontend {
 
         this.xterm.loadAddon(this.search)
 
+        this.search.onDidChangeResults(state => {
+            this.searchState = state ?? { resultCount: 0 }
+        })
+
         window.addEventListener('resize', this.resizeHandler)
 
         this.resizeHandler()
@@ -186,6 +205,7 @@ export class XTermFrontend extends Frontend {
     detach (_host: HTMLElement): void {
         window.removeEventListener('resize', this.resizeHandler)
         this.resizeObserver?.disconnect()
+        delete this.resizeObserver
     }
 
     destroy (): void {
@@ -203,7 +223,7 @@ export class XTermFrontend extends Frontend {
         if (!text.trim().length) {
             return
         }
-        if (text.length < 1024 * 32) {
+        if (text.length < 1024 * 32 && this.configService.store.terminal.copyAsHTML) {
             this.platformService.setClipboard({
                 text: this.getSelection(),
                 html: this.getSelectionAsHTML(),
@@ -306,12 +326,40 @@ export class XTermFrontend extends Frontend {
         this.setFontSize()
     }
 
-    findNext (term: string, searchOptions?: SearchOptions): boolean {
-        return this.search.findNext(term, searchOptions)
+    private getSearchOptions (searchOptions?: SearchOptions): ISearchOptions {
+        return {
+            ...searchOptions,
+            decorations: {
+                matchOverviewRuler: '#cccc00',
+                activeMatchColorOverviewRuler: '#ffff00',
+                matchBorder: '#cc0',
+                activeMatchBorder: '#ff0',
+                activeMatchBackground: 'rgba(255, 255, 0, 0.125)',
+            },
+        }
     }
 
-    findPrevious (term: string, searchOptions?: SearchOptions): boolean {
-        return this.search.findPrevious(term, searchOptions)
+    private wrapSearchResult (result: boolean): SearchState {
+        if (!result) {
+            return { resultCount: 0 }
+        }
+        return this.searchState
+    }
+
+    findNext (term: string, searchOptions?: SearchOptions): SearchState {
+        return this.wrapSearchResult(
+            this.search.findNext(term, this.getSearchOptions(searchOptions))
+        )
+    }
+
+    findPrevious (term: string, searchOptions?: SearchOptions): SearchState {
+        return this.wrapSearchResult(
+            this.search.findPrevious(term, this.getSearchOptions(searchOptions))
+        )
+    }
+
+    cancelSearch (): void {
+        this.search.clearDecorations()
     }
 
     saveState (): any {
@@ -328,6 +376,10 @@ export class XTermFrontend extends Frontend {
 
     supportsBracketedPaste (): boolean {
         return this.xterm.modes.bracketedPasteMode
+    }
+
+    isAlternateScreenActive (): boolean {
+        return this.xterm.buffer.active.type === 'alternate'
     }
 
     private setFontSize () {

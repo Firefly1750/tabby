@@ -22,9 +22,9 @@
     "@types/node" "*"
 
 "@types/ssh2@^0.5.46":
-  version "0.5.49"
-  resolved "https://registry.yarnpkg.com/@types/ssh2/-/ssh2-0.5.49.tgz#40014f780e3b7e6e667503df414fc884089c76e4"
-  integrity sha512-ffxhQhJqgTzrw8NxHTgkaDtAmAj2qxCyoves7ztpRgqvzbHcZTpTcm+ATWuuCbPQzxnnF4F3SGGTLGEWTZpwqA==
+  version "0.5.52"
+  resolved "https://registry.yarnpkg.com/@types/ssh2/-/ssh2-0.5.52.tgz#9dbd8084e2a976e551d5e5e70b978ed8b5965741"
+  integrity sha512-lbLLlXxdCZOSJMCInKH2+9V/77ET2J6NPQHpFI0kda61Dd1KglJs+fPQBchizmzYSOJBgdTajhPqBO1xxLywvg==
   dependencies:
     "@types/node" "*"
     "@types/ssh2-streams" "*"
@@ -227,9 +227,9 @@ sprintf@0.1.x:
   resolved "https://registry.yarnpkg.com/sprintf/-/sprintf-0.1.5.tgz#8f83e39a9317c1a502cb7db8050e51c679f6edcf"
   integrity sha1-j4PjmpMXwaUCy324BQ5Rxnn27c8=
 
-sshpk@Eugeny/node-sshpk#89ed17dfae425a8b629873c8337e77d26838c04f:
+sshpk@Eugeny/node-sshpk#d92ddb8def1778e876703f90cd6ff2c90900f390:
   version "1.16.1"
-  resolved "https://codeload.github.com/Eugeny/node-sshpk/tar.gz/89ed17dfae425a8b629873c8337e77d26838c04f"
+  resolved "https://codeload.github.com/Eugeny/node-sshpk/tar.gz/d92ddb8def1778e876703f90cd6ff2c90900f390"
   dependencies:
     asn1 "~0.2.3"
     assert-plus "^1.0.0"

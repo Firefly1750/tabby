@@ -4,6 +4,7 @@ import { ipcMain } from 'electron'
 import { Application } from './app'
 import { UTF8Splitter } from './utfSplitter'
 import { Subject, debounceTime } from 'rxjs'
+import { StringDecoder } from './stringDecoder'
 
 class PTYDataQueue {
     private buffers: Buffer[] = []
@@ -90,6 +91,8 @@ class PTYDataQueue {
 export class PTY {
     private pty: nodePTY.IPty
     private outputQueue: PTYDataQueue
+    private decoder = new StringDecoder()
+    exited = false
 
     constructor (private id: string, private app: Application, ...args: any[]) {
         this.pty = (nodePTY as any).spawn(...args)
@@ -98,10 +101,13 @@ export class PTY {
         }
 
         this.outputQueue = new PTYDataQueue(this.pty, data => {
-            setImmediate(() => this.emit('data', data))
+            setImmediate(() => this.emit('data', this.decoder.write(data)))
         })
 
-        this.pty.on('data', data => this.outputQueue.push(Buffer.from(data)))
+        this.pty.onData(data => this.outputQueue.push(Buffer.from(data)))
+        this.pty.onExit(() => {
+            this.exited = true
+        })
     }
 
     getPID (): number {
@@ -144,7 +150,7 @@ export class PTYManager {
         })
 
         ipcMain.on('pty:exists', (event, id) => {
-            event.returnValue = !!this.ptys[id]
+            event.returnValue = this.ptys[id] && !this.ptys[id].exited
         })
 
         ipcMain.on('pty:get-pid', (event, id) => {

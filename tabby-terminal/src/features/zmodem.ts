@@ -26,19 +26,22 @@ export class ZModemDecorator extends TerminalDecorator {
     }
 
     attach (terminal: BaseTerminalTabComponent): void {
+        let isActive = false
         const sentry = new ZModem.Sentry({
             to_terminal: data => {
-                if (!terminal.enablePassthrough) {
+                if (isActive) {
                     terminal.write(data)
                 }
             },
-            sender: data => terminal.session!.write(Buffer.from(data)),
+            sender: data => terminal.session!.feedFromTerminal(Buffer.from(data)),
             on_detect: async detection => {
                 try {
                     terminal.enablePassthrough = false
+                    isActive = true
                     await this.process(terminal, detection)
                 } finally {
                     terminal.enablePassthrough = true
+                    isActive = false
                 }
             },
             on_retract: () => {
@@ -163,7 +166,7 @@ export class ZModemDecorator extends TerminalDecorator {
         const offer = {
             name: transfer.getName(),
             size: transfer.getSize(),
-            mode: 0o755,
+            mode: transfer.getMode(),
             files_remaining: filesRemaining,
             bytes_remaining: sizeRemaining,
         }
